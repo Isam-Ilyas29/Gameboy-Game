@@ -16,6 +16,8 @@ MAIN_OBJ = $(OBJ_DIR)/main.o
 GAME_ASM = $(SRC_DIR)/Game/game.asm
 GAME_OBJ = $(OBJ_DIR)/game.o
 
+ROM_SYM = $(BIN_DIR)/rom.sym
+
 ROM_BIN = $(BIN_DIR)/rom.gb
 
 #-------------------------------------------------------------------#
@@ -23,7 +25,7 @@ ROM_BIN = $(BIN_DIR)/rom.gb
 all:
 	rgbasm -o "$(MAIN_OBJ)" "$(MAIN_ASM)"
 	rgbasm -o "$(GAME_OBJ)" "$(GAME_ASM)"
-	rgblink -o "$(ROM_BIN)" "$(MAIN_OBJ)" "$(GAME_OBJ)"
+	rgblink -o "$(ROM_BIN)" "$(MAIN_OBJ)" "$(GAME_OBJ)" -n "$(ROM_SYM)"
 	rgbfix -v -p 0xFF "$(ROM_BIN)"
 	
 ifeq ($(OS), Windows_NT)
