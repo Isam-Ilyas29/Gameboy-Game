@@ -1,5 +1,9 @@
 ;*****************************************************************************************************;
 
+INCLUDE "Source/hardware.inc"
+
+;*****************************************************************************************************;
+
 SECTION "Header", ROM0[$100]
 
 EntryPoint::
@@ -14,8 +18,16 @@ ENDR
 SECTION "Application", ROM0
 
 Game::
-    call Begin
-    call Graphics
-    call End
+
+.begin
+    ; Sets colour palette
+    ld a, %11100100
+    ld [rBGP], a
+    call GraphicsBegin
+
+.gameloop
+    call GraphicsProcess
+    call Input
+    jr .gameloop
 
 ;*****************************************************************************************************;

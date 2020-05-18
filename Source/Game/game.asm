@@ -8,29 +8,33 @@ SECTION "Game", ROM0
 
 ;*****************************************************************************************************;
 
-Begin::
+WaitVBlank::
 
-.colourPalette
-    ; Sets colour palette
-    ld a, %11100100
-    ld [rBGP], a   
-
-;*****************************************************************************************************;
-
-Graphics::
-
-;*****************************************************************************************************;
-
-; TEXT
+;********************************************************;
 
 .waitVBlank
     ld a, [rLY]                             ; Sets a to scanline number
-    cp 144                                  ; Compares a to scanline
+    cp a, 144                               ; Compares a to scanline
     jr c, .waitVBlank                       
 
-    xor a                                   
+    xor a, a                                   
 
-    ld [rLCDC], a                           
+    ld [rLCDC], a  
+
+    
+    ret
+
+;********************************************************;
+
+;*****************************************************************************************************;
+
+GraphicsBegin::
+
+call WaitVBlank
+
+;********************************************************;
+
+; TEXT                        
 
 .initialiseFontData
     ld hl, $9000                            
@@ -43,7 +47,7 @@ Graphics::
     inc de                                  ; Moves to next byte
     dec bc                                  ; Decrements count
     ld a, b                                 ; Checks if everything was copied, since `dec bc` doesn't update flags
-    or c                                    ; Sets z flag if bc is 0
+    or a, c                                 ; Sets z flag if bc is 0
     jr nz, .copyFont                        
     ld hl, $9800 + (32 * 0) + (17)           ; Displays string in top middle of screen
 
@@ -53,19 +57,20 @@ Graphics::
     ld a, [de]
     ld [hli], a
     inc de
-    and a                                   ; Checks if the byte we just copied is zero (Equivalent to `cp a, 0`)
+    and a, a                                 ; Checks if the byte we just copied is zero (Equivalent to `cp a, 0`)
     jr nz, .copyString                      
 
     ; Sets co-ordinates for top left corner of screen
-    xor a                                   
+    xor a, a                                   
     ld [rSCY], a
     ld [rSCX], a
 
-;*****************************************************************************************************;
+;********************************************************;
 
 ; TILES
 
 ; GRASS: 
+
 .initialiseTileGrassData
     ld hl, $9010                            
     ld de, TileGrass                        ; Store tile data for grass
@@ -104,6 +109,7 @@ Graphics::
 
 
 ; TREE:
+
 .initialiseTileTreeData
     ld hl, $9020                            
     ld de, TileTree                         ; Store tile data for tree
@@ -148,7 +154,9 @@ Graphics::
     ld [$990B], a
     ld [$990C], a
 
+
 ;COIN: 
+
 .initialiseTileCoinData
     ld hl, $90A0                            
     ld de, TileCoin                         ; Store tile data for coin
@@ -173,7 +181,7 @@ Graphics::
     ld a, $0
     ld [$990D], a
 
-;*****************************************************************************************************;
+;********************************************************;
 
 ; SPRITES
 
@@ -184,32 +192,184 @@ Graphics::
     ld [bc], a
     jr nz, .clearOAM
 
-.initialiseSpriteManData
-    ld hl, $8000
-    ld de, SpriteMan
-    ld bc, SpriteManEnd - SpriteMan
+.initialiseSpriteManDataOAM
+    ; Sprite data
+    ld a, 128
+    ld [wSpriteManTopYPos], a
+    ld a, 9
+    ld [wSpriteManTopXPos], a
+    ld a, 136
+    ld [wSpriteManBottomYPos], a
+    ld a, 9
+    ld [wSpriteManBottomXPos], a
 
-.copySpriteMan
+    ld a, 0
+    ld [wSpriteManMovementUpDelayCount], a
+    ld [wSpriteManMovementLeftDelayCount], a
+    ld [wSpriteManMovementDownDelayCount], a
+    ld [wSpriteManMovementRightDelayCount], a
+
+.initialiseSpriteManDataVRAM
+    ; Tile data
+    ld hl, $8000
+    ld de, TileMan
+    ld bc, TileManEnd - TileMan
+
+.copySpriteManVRAM
     ld a, [de]                              ; Grabs 1 byte from source
     ld [hli], a                             ; Places it at the destination, incrementing hl
     inc de                                  ; Moves to next byte
     dec bc                                  ; Decrements count
     ld a, b                                 ; Checks if everything was copied, since `dec bc` doesn't update flags
     or c                                    ; Sets z flag if bc is 0
-    jr nz, .copySpriteMan
+    jr nz, .copySpriteManVRAM
 
-    ld a, 128                               ; Y pos
+
+.end
+    ; Shuts sound down
+    ld [rNR52], a
+
+    ; Turns screen on, display background
+    ld a, %10000011                         ; Bit 7 to turn lcd on, BIt 1 to enable sprite rendering, Bit 0 to display background
+    ld [rLCDC], a 
+
+
+    ret
+
+;********************************************************;
+
+;*****************************************************************************************************;
+
+GraphicsProcess::
+
+;********************************************************;
+
+; SPRITES
+
+.movementUp
+    ; Check for up button
+    ld a, [wHeldButtons]
+    and a, %01000000
+
+    jp z, .movementLeft
+
+    ; Check if its been 75 frames
+    ld a, [wSpriteManMovementUpDelayCount]
+    inc a
+    ld [wSpriteManMovementUpDelayCount], a
+    cp a, 105
+
+    jp nz, .movementLeft
+
+    ; Moves one pixel up
+    ld a, [wSpriteManTopYPos]
+    dec a
+    ld [wSpriteManTopYPos], a
+    ld a, [wSpriteManBottomYPos]
+    dec a
+    ld [wSpriteManBottomYPos], a
+
+    ; Reset to 0
+    ld a, 0
+    ld [wSpriteManMovementUpDelayCount], a
+
+.movementLeft
+    ; Check for left button
+    ld a, [wHeldButtons]
+    and a, %00100000
+
+    jp z, .movementDown
+
+    ; Check if its been 75 frames
+    ld a, [wSpriteManMovementLeftDelayCount]
+    inc a
+    ld [wSpriteManMovementLeftDelayCount], a
+    cp a, 105
+
+    jp nz, .movementDown
+
+    ; Moves one pixel left
+    ld a, [wSpriteManTopXPos]
+    dec a
+    ld [wSpriteManTopXPos], a
+    ld a, [wSpriteManBottomXPos]
+    dec a
+    ld [wSpriteManBottomXPos], a
+
+    ; Reset to 0
+    ld a, 0
+    ld [wSpriteManMovementLeftDelayCount], a
+
+.movementDown
+    ; Check for down button
+    ld a, [wHeldButtons]
+    and a, %10000000
+
+    jp z, .movementRight
+
+    ; Check if its been 75 frames
+    ld a, [wSpriteManMovementDownDelayCount]
+    inc a
+    ld [wSpriteManMovementDownDelayCount], a
+    cp a, 105
+
+    jp nz, .movementRight
+
+    ; Moves one pixel down
+    ld a, [wSpriteManTopYPos]
+    inc a
+    ld [wSpriteManTopYPos], a
+    ld a, [wSpriteManBottomYPos]
+    inc a
+    ld [wSpriteManBottomYPos], a
+
+    ; Reset to 0
+    ld a, 0
+    ld [wSpriteManMovementDownDelayCount], a
+
+.movementRight
+    ; Check for right button
+    ld a, [wHeldButtons]
+    and a, %00010000
+
+    jp z, .copySpriteManOAM
+
+    ; Check if its been 75 frames
+    ld a, [wSpriteManMovementRightDelayCount]
+    inc a
+    ld [wSpriteManMovementRightDelayCount], a
+    cp a, 105
+
+    jp nz, .copySpriteManOAM
+
+    ; Moves one pixel right
+    ld a, [wSpriteManTopXPos]
+    inc a
+    ld [wSpriteManTopXPos], a
+    ld a, [wSpriteManBottomXPos]
+    inc a
+    ld [wSpriteManBottomXPos], a
+
+    ; Reset to 0
+    ld a, 0
+    ld [wSpriteManMovementRightDelayCount], a
+
+    ;*********************;
+    
+
+.copySpriteManOAM
+    ld a, [wSpriteManTopYPos]               ; Y pos
     ld [$FE00], a
-    ld a, 9                                 ; X pos
+    ld a, [wSpriteManTopXPos]               ; X pos
     ld [$FE01], a
     ld a, %00000000                         ; Tile location
     ld [$FE02], a 
     ld a, %00000000                         ; Attributes
     ld [$FE03], a
 
-    ld a, 136                               ; Y pos
+    ld a, [wSpriteManBottomYPos]            ; Y pos
     ld [$FE04], a
-    ld a, 9                                 ; X pos
+    ld a, [wSpriteManBottomXPos]            ; X pos
     ld [$FE05], a
     ld a, %00000001                         ; Tile location
     ld [$FE06], a
@@ -221,22 +381,50 @@ Graphics::
     ld [rOBP0], a
     ld [rOBP1], a
 
-;*****************************************************************************************************;
-
-.end
-    ; Shuts sound down
-    ld [rNR52], a
-
-    ; Turns screen on, display background
-    ld a, %10000011                         ; Bit 7 to turn lcd on, BIt 1 to enable sprite rendering, Bit 0 to display background
-    ld [rLCDC], a 
+;********************************************************;
 
 ;*****************************************************************************************************;
 
-End::
+Input::
 
-.lockup
-    jr .lockup
+;********************************************************;
+
+.getInput
+    ; Direction buttons
+
+    ld  a, %00100000   
+    ld  [rP1], a                    
+
+    ; Takes a few cycles to get accurate reading
+	ld  a, [rP1]		                        
+	ld  a, [rP1]
+	ld  a, [rP1]
+
+    cpl
+    and a, %00001111
+    swap a
+    ld b, a
+
+
+    ; Other buttons
+
+    ld  a, %00010000                        
+    ld  [rP1], a
+
+    ; Takes a few cycles to get accurate reading
+	ld  a, [rP1]		                        
+	ld  a, [rP1]
+	ld  a, [rP1]
+
+    cpl
+    and a, %00001111
+    or a, b
+    ld [wHeldButtons], a
+
+
+    ret
+
+;********************************************************;
 
 ;*****************************************************************************************************;
 
@@ -276,13 +464,38 @@ TileCoin::
     db $3C, $3C, $42, $7E, $91, $EF, $A1, $DF, $81, $FF, $81, $FF, $42, $7E, $3C, $3C
 TileCoinEnd::
 
-;*****************************************************************************************************;
-
-SECTION "Sprites", rom0
-
-SpriteMan::
+TileMan::
     db $00, $7E, $00, $7E, $00, $FF, $42, $46, $42, $42, $42, $4E, $3C, $3C, $3C, $3D
     db $2C, $3E, $30, $3C, $3C, $3C, $28, $28, $6C, $6C, $6C, $6C, $C6, $C6, $00, $E7
-SpriteManEnd::
+TileManEnd::
+
+;*****************************************************************************************************;
+
+SECTION "Sprites", WRAM0
+
+wSpriteManTopXPos::
+    dw
+wSpriteManTopYPos::
+    dw 
+wSpriteManBottomXPos::
+    dw 
+wSpriteManBottomYPos::
+    dw 
+
+wSpriteManMovementUpDelayCount::
+    db
+wSpriteManMovementLeftDelayCount::
+    db
+wSpriteManMovementDownDelayCount::
+    db
+wSpriteManMovementRightDelayCount::
+    db
+
+;*****************************************************************************************************;
+
+SECTION "Input", WRAM0
+
+wHeldButtons::
+    db
 
 ;*****************************************************************************************************;
