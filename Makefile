@@ -31,7 +31,7 @@ all:
 ifeq ($(OS), Windows_NT)
 	"$(BGB)/bgb.exe" "$(BIN_DIR)/rom.gb"
 else
-	wine "$(BGB)/bgb" "$(BIN_DIR)/rom.gb"
+	wine "$(BGB)/bgb.exe" "$(BIN_DIR)/rom.gb"
 endif
 
 #-------------------------------------------------------------------#

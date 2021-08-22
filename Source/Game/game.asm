@@ -192,6 +192,8 @@ call WaitVBlank
     ld [bc], a
     jr nz, .clearOAM
 
+; MAN
+
 .initialiseSpriteManDataOAM
     ; Sprite data
     ld a, 128
@@ -224,6 +226,30 @@ call WaitVBlank
     or c                                    ; Sets z flag if bc is 0
     jr nz, .copySpriteManVRAM
 
+; REVOLVER
+
+.initialiseSpriteRevolverDataOAM
+    ; Sprite data
+    ld a, 130
+    ld [wSpriteRevolverYPos], a
+    ld a, 16
+    ld [wSpriteRevolverXPos], a
+
+.initialiseSpriteRevolverDataVRAM
+    ; Tile data
+    ld hl, $8020
+    ld de, TileRevolver
+    ld bc, TileRevolverEnd - TileRevolver
+
+.copySpriteRevolverVRAM
+    ld a, [de]                              ; Grabs 1 byte from source
+    ld [hli], a                             ; Places it at the destination, incrementing hl
+    inc de                                  ; Moves to next byte
+    dec bc                                  ; Decrements count
+    ld a, b                                 ; Checks if everything was copied, since `dec bc` doesn't update flags
+    or c                                    ; Sets z flag if bc is 0
+    jr nz, .copySpriteRevolverVRAM
+
 
 .end
     ; Shuts sound down
@@ -245,6 +271,8 @@ GraphicsProcess::
 ;********************************************************;
 
 ; SPRITES
+
+; MOVEMENT
 
 .movementUp
     ; Check for up button
@@ -353,9 +381,8 @@ GraphicsProcess::
     ; Reset to 0
     ld a, 0
     ld [wSpriteManMovementRightDelayCount], a
-
-    ;*********************;
     
+; MAN
 
 .copySpriteManOAM
     ld a, [wSpriteManTopYPos]               ; Y pos
@@ -376,7 +403,21 @@ GraphicsProcess::
     ld a, %00000000                         ; Attributes
     ld [$FE07], a
 
-.setSpriteMan
+; REVOLVER
+
+.copySpriteRevolverOAM
+    ld a, [wSpriteRevolverYPos]             ; Y pos
+    ld [$FE08], a
+    ld a, [wSpriteRevolverXPos]             ; X pos
+    ld [$FE09], a
+    ld a, %00000010                         ; Tile location
+    ld [$FE0A], a 
+    ld a, %00000000                         ; Attributes
+    ld [$FE0B], a
+
+; PALETTE
+
+.setPalette
     ld a, %11100100
     ld [rOBP0], a
     ld [rOBP1], a
@@ -445,6 +486,7 @@ StringCoinCount::
 
 SECTION "Tiles", ROM0
 
+; Grass
 TileGrass::
     db $00, $FF, $00, $FF, $44, $FF, $ED, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF
 TileGrassEnd::
@@ -460,19 +502,29 @@ TileTree::
     db $00, $00, $00, $C0, $80, $60, $40, $B0, $20, $D8, $10, $EC, $00, $FE, $00, $FE
 TileTreeEnd::
 
+; Coin
 TileCoin::
     db $3C, $3C, $42, $7E, $91, $EF, $A1, $DF, $81, $FF, $81, $FF, $42, $7E, $3C, $3C
 TileCoinEnd::
 
+; Man
 TileMan::
     db $00, $7E, $00, $7E, $00, $FF, $42, $46, $42, $42, $42, $4E, $3C, $3C, $3C, $3D
     db $2C, $3E, $30, $3C, $3C, $3C, $28, $28, $6C, $6C, $6C, $6C, $C6, $C6, $00, $E7
 TileManEnd::
 
+; Revolver
+TileRevolver::
+    db $00, $00, $00, $00, $7F, $7F, $7F, $41, $5F, $7F, $94, $F4, $A8, $E8, $60, $60
+TileRevolverEnd::
+
 ;*****************************************************************************************************;
 
 SECTION "Sprites", WRAM0
 
+; Man
+
+; Position
 wSpriteManTopXPos::
     dw
 wSpriteManTopYPos::
@@ -482,6 +534,7 @@ wSpriteManBottomXPos::
 wSpriteManBottomYPos::
     dw 
 
+; Movement delay
 wSpriteManMovementUpDelayCount::
     db
 wSpriteManMovementLeftDelayCount::
@@ -490,6 +543,14 @@ wSpriteManMovementDownDelayCount::
     db
 wSpriteManMovementRightDelayCount::
     db
+
+; Revolver
+
+; Position
+wSpriteRevolverXPos::
+    dw
+wSpriteRevolverYPos::
+    dw 
 
 ;*****************************************************************************************************;
 
